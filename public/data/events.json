@@ -1,0 +1,71 @@
+[
+  {
+    "id": "sn1987a",
+    "name": "Supernova 1987A",
+    "type": "Supernova",
+    "date": "1987-02-23T07:35:00Z",
+    "description": "A supernova in the Large Magellanic Cloud, a nearby dwarf galaxy. It was the closest observed supernova since Kepler's Supernova in 1604.",
+    "image": "https://placehold.co/600x400/242959/FFFFFF.png?text=SN+1987A",
+    "metadataUri": "ipfs://QmRealHash/supernova1987a.json",
+    "simulated": false,
+    "coordinates": { "ra": "05h 35m 28.03s", "dec": "-69° 16′ 11.07″" },
+    "magnitude": 2.9,
+    "distance": "168,000 light-years",
+    "data-ai-hint": "supernova galaxy"
+  },
+  {
+    "id": "eclipse2024",
+    "name": "Total Solar Eclipse 2024",
+    "type": "Solar Eclipse",
+    "date": "2024-04-08T18:17:00Z",
+    "description": "A total solar eclipse that was visible across a band of North America, from Mexico, through the United States, and into Canada.",
+    "image": "https://placehold.co/600x400/242959/FFFFFF.png?text=Solar+Eclipse",
+    "metadataUri": "ipfs://QmAnotherHash/eclipse2024.json",
+    "simulated": false,
+    "data-ai-hint": "solar eclipse"
+  },
+  {
+    "id": "perseids2025",
+    "name": "Perseids Meteor Shower 2025",
+    "type": "Meteor Shower",
+    "date": "2025-08-12T20:00:00Z",
+    "description": "The Perseids are a prolific meteor shower associated with the comet Swift–Tuttle. The peak of the shower is expected around mid-August.",
+    "image": "https://placehold.co/600x400/242959/FFFFFF.png?text=Perseids+2025",
+    "metadataUri": "ipfs://QmYetAnotherHash/perseids2025.json",
+    "simulated": false,
+    "data-ai-hint": "meteor shower"
+  },
+  {
+    "id": "sim_alpha_centauri_flare",
+    "name": "Simulated Alpha Centauri Flare",
+    "type": "Supernova",
+    "date": "2025-10-15T10:00:00Z",
+    "description": "A simulated stellar flare event on Proxima Centauri, the closest known star to the Sun. This event showcases potential high-energy phenomena.",
+    "image": "https://placehold.co/600x400/242959/FFFFFF.png?text=Alpha+Centauri+Flare",
+    "metadataUri": "ipfs://QmSimHash1/alphacentauriflare.json",
+    "simulated": true,
+    "data-ai-hint": "star flare"
+  },
+  {
+    "id": "comet_halley_2061",
+    "name": "Comet Halley Return (Simulated Observation)",
+    "type": "Comet",
+    "date": "2061-07-28T00:00:00Z",
+    "description": "A simulated early observation of Comet Halley's next perihelion passage. Halley's Comet is a short-period comet visible from Earth every 75–79 years.",
+    "image": "https://placehold.co/600x400/242959/FFFFFF.png?text=Comet+Halley",
+    "metadataUri": "ipfs://QmSimHash2/comethalley.json",
+    "simulated": true,
+    "data-ai-hint": "comet space"
+  },
+  {
+    "id": "andromeda_collision_preview",
+    "name": "Andromeda-Milky Way Collision Preview",
+    "type": "Galaxy Merger",
+    "date": "2025-12-01T00:00:00Z",
+    "description": "A simulated artistic representation of the future collision between the Milky Way and Andromeda galaxies, billions of years from now.",
+    "image": "https://placehold.co/600x400/242959/FFFFFF.png?text=Galaxy+Collision",
+    "metadataUri": "ipfs://QmSimHash3/galaxycollision.json",
+    "simulated": true,
+    "data-ai-hint": "galaxy collision"
+  }
+]
