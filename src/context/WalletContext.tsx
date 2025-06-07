@@ -16,12 +16,12 @@ const TARGET_NETWORK_NAME = "Sepolia Testnet"; // Example: "Ethereum Mainnet"
 const ASTRO_TOKEN_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)" // Note: ethers.js v6 uses uint256, not uint250
+  "function allowance(address owner, address spender) view returns (uint256)"
 ];
 const ASTRO_NFT_ABI = [
   "function mintNFT(string memory tokenURI) public",
   "function walletOfOwner(address _owner) public view returns (uint256[] memory)",
-  "function tokenURI(uint256 tokenId) public view returns (string memory)" // For fetching metadata URI
+  "function tokenURI(uint256 tokenId) public view returns (string memory)"
 ];
 // --- END CONFIGURATION ---
 
@@ -30,7 +30,7 @@ interface WalletContextType extends WalletState {
   disconnectWallet: () => void;
   approveAstroTokens: (amount: number) => Promise<boolean>;
   mintAstroNft: (metadataUri: string) => Promise<boolean>;
-  fetchWalletData: () => Promise<void>;
+  fetchWalletData: (addressToFetchFor: string) => Promise<void>; // Parameter added
   checkAllowance: (spenderAddress: string, amount: number) => Promise<boolean>;
   targetNetworkName: string;
 }
@@ -41,7 +41,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [address, setAddress] = useState<string | null>(null);
   const [astroBalance, setAstroBalance] = useState<number>(0);
   const [nfts, setNfts] = useState<Nft[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false); // Combined loading state
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -82,15 +82,18 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       toast({ title: "Wrong Network", description: errMsg, variant: "destructive", duration: 7000 });
       return false;
     }
+    setError(null); // Clear network error if correct
     return true;
   };
 
-  const fetchWalletData = useCallback(async (currentAddress?: string) => {
-    const addrToUse = currentAddress || address;
-    if (!addrToUse) return;
+  const fetchWalletData = useCallback(async (addressToFetchFor: string) => {
+    if (!addressToFetchFor) {
+      // console.warn("fetchWalletData called without an address.");
+      return;
+    }
 
     setLoading(true);
-    setError(null); // Clear previous errors
+    // setError(null); // Error is reset by checkNetwork or at start of connectWallet etc.
 
     const provider = getProvider();
     if (!provider) {
@@ -101,62 +104,27 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (!await checkNetwork(provider)) {
       setLoading(false);
+      // Clear data if network is wrong to avoid showing stale data from another network
+      setAstroBalance(0);
+      setNfts([]);
       return;
     }
 
     try {
-      // Fetch ASTRO balance
       const tokenContract = getAstroTokenContract(provider);
-      const balanceBigInt = await tokenContract.balanceOf(addrToUse);
+      const balanceBigInt = await tokenContract.balanceOf(addressToFetchFor);
       const formattedBalance = parseFloat(ethers.formatEther(balanceBigInt));
       setAstroBalance(formattedBalance);
 
-      // Fetch NFTs
-      const nftContract = getAstroNftContract(provider);
-      // const ownedTokenIds: ethers.BigNumberish[] = await nftContract.walletOfOwner(addrToUse);
-      
       // --- MOCK NFT DATA (Remove/replace with actual fetching) ---
-      // In a real app, you would iterate through ownedTokenIds, call nftContract.tokenURI(tokenId),
-      // fetch metadata from IPFS/HTTP, parse it, and then create Nft objects.
       const mockNfts: Nft[] = [
         { id: "1", name: "Supernova Spectacle", description: "Witness the birth of new elements.", image: "https://placehold.co/300x300/242959/FFFFFF.png?text=NFT+1", event: {id: "sn1987a", name: "Supernova 1987A", date: "1987-02-23T07:35:00Z"}, metadataUri: "ipfs://QmExampleHash1"},
         { id: "2", name: "Eclipse Elegance", description: "A dance of celestial bodies.", image: "https://placehold.co/300x300/7B62FF/FFFFFF.png?text=NFT+2", event: {id: "eclipse2024", name: "Total Solar Eclipse 2024", date: "2024-04-08T18:17:00Z"}, metadataUri: "ipfs://QmExampleHash2"},
       ];
-      // TODO: Replace mockNfts with actual NFT fetching logic:
-      // const fetchedNfts: Nft[] = await Promise.all(
-      //   ownedTokenIds.map(async (tokenId: ethers.BigNumberish) => {
-      //     try {
-      //       const metadataUri = await nftContract.tokenURI(tokenId.toString());
-      //       // const response = await fetch(ipfsGatewayUrl(metadataUri)); // ipfsGatewayUrl helper needed
-      //       // const metadata = await response.json();
-      //       // return {
-      //       //   id: tokenId.toString(),
-      //       //   name: metadata.name,
-      //       //   description: metadata.description,
-      //       //   image: ipfsGatewayUrl(metadata.image),
-      //       //   event: { id: metadata.event?.id || "unknown", name: metadata.event?.name || "Unknown Event", date: metadata.event?.date || new Date().toISOString() },
-      //       //   metadataUri: metadataUri
-      //       // };
-      //       // This is a placeholder for the above logic
-      //        return {
-      //          id: tokenId.toString(),
-      //          name: `Astro NFT #${tokenId.toString()}`,
-      //          description: "An amazing astrophysical event NFT.",
-      //          image: `https://placehold.co/300x300/242959/FFFFFF.png?text=NFT+${tokenId.toString()}`,
-      //          event: { id: "mockEvent", name: "Mock Event", date: new Date().toISOString() },
-      //          metadataUri: `ipfs://mockhash/${tokenId.toString()}`
-      //        };
-      //     } catch (e) {
-      //       console.error(`Failed to fetch metadata for token ID ${tokenId.toString()}:`, e);
-      //       return null; // Or some error placeholder NFT
-      //     }
-      //   })
-      // );
-      // setNfts(fetchedNfts.filter(nft => nft !== null) as Nft[]);
-      setNfts(mockNfts);
-      // --- END MOCK NFT DATA ---
+      // TODO: Implement actual NFT fetching logic here using addressToFetchFor
+      setNfts(mockNfts); // Using mock data for now
 
-      toast({ title: "Wallet Data Updated", description: `Balance: ${formattedBalance.toFixed(4)} ASTRO` });
+      toast({ title: "Wallet Data Updated", description: `Balance for ${addressToFetchFor.substring(0,6)}...: ${formattedBalance.toFixed(4)} ASTRO` });
     } catch (err: any) {
       console.error("Error fetching wallet data:", err);
       const displayError = err.reason || err.message || "Failed to fetch wallet data. Ensure you are on the correct network and contract addresses are valid.";
@@ -165,7 +133,28 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } finally {
       setLoading(false);
     }
-  }, [address, getProvider, toast, getAstroTokenContract, getAstroNftContract]);
+  }, [getProvider, toast, getAstroTokenContract, getAstroNftContract]); // Removed `address` from dependencies
+
+  // Effect for initializing address from localStorage or using a default for development
+  useEffect(() => {
+    const DEV_DEFAULT_ADDRESS = "0x0fE810267f02D7AbA8Ac7dD763ff534d8d6a8CF8";
+    let initialAddressToUse: string | null = localStorage.getItem('walletAddress');
+
+    if (!initialAddressToUse) {
+      // For development convenience, if no address is stored, use the specified one.
+      // In a real production app, you might not want this behavior
+      // or guard it with a development environment flag.
+      initialAddressToUse = DEV_DEFAULT_ADDRESS;
+      localStorage.setItem('walletAddress', initialAddressToUse); // Persist this dev address for subsequent loads
+      console.warn(`WalletContext: No stored address found. Using default development address: ${initialAddressToUse}. Connect via MetaMask to use a different account.`);
+    }
+    
+    if (initialAddressToUse) {
+      setAddress(initialAddressToUse);
+      fetchWalletData(initialAddressToUse);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchWalletData]); // fetchWalletData is now stable
 
   const connectWallet = async () => {
     setLoading(true);
@@ -189,9 +178,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setAddress(newAddress);
         localStorage.setItem('walletAddress', newAddress);
         toast({ title: "Wallet Connected", description: `Connected to ${newAddress.substring(0,6)}...${newAddress.substring(newAddress.length-4)}` });
-        await fetchWalletData(newAddress); // Pass newAddress directly
+        await fetchWalletData(newAddress);
       } else {
         setError("No accounts found. Please ensure your wallet is set up correctly.");
+        toast({ title: "Connection Issue", description: "No accounts found in MetaMask.", variant: "destructive" });
       }
     } catch (err: any) {
       console.error("Failed to connect wallet:", err);
@@ -213,16 +203,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [toast]);
   
   useEffect(() => {
-    const storedAddress = localStorage.getItem('walletAddress');
-    if (storedAddress) {
-      setAddress(storedAddress);
-      // No automatic fetchWalletData here to avoid race conditions with network checks,
-      // it will be called on connect or manual refresh.
-    }
-  }, []);
-
-  // Effect for handling account and chain changes
-  useEffect(() => {
     const provider = getProvider();
     if (!provider || !window.ethereum || !window.ethereum.on) return;
 
@@ -231,7 +211,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const newAddress = accounts[0];
         setAddress(newAddress);
         localStorage.setItem('walletAddress', newAddress);
-        fetchWalletData(newAddress); // Pass newAddress
+        fetchWalletData(newAddress);
         toast({ title: "Account Changed", description: `Switched to ${newAddress.substring(0,6)}...${newAddress.substring(newAddress.length-4)}` });
       } else {
         disconnectWallet();
@@ -239,24 +219,27 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     const handleChainChanged = async (_chainId: string) => {
-      toast({ title: "Network Changed", description: "Network has changed. Verifying and reloading data..." });
-      // Re-check network and fetch data
-      const currentProvider = getProvider(); // Get fresh provider instance
+      toast({ title: "Network Changed", description: "Verifying network and reloading data..." });
+      const currentProvider = getProvider();
       if (currentProvider) {
-          if (await checkNetwork(currentProvider)) {
-              const currentSigner = await currentProvider.getSigner();
-              if(currentSigner) {
-                const currentAddress = await currentSigner.getAddress();
-                setAddress(currentAddress); // Ensure address is current
-                fetchWalletData(currentAddress);
-              } else {
-                disconnectWallet(); // If no signer, disconnect
-              }
-          } else {
-            // If checkNetwork fails, it sets error and toasts. Clear local data.
-            setAstroBalance(0);
-            setNfts([]);
+        const wasCorrectNetwork = await checkNetwork(currentProvider); // This will set error if wrong
+        if (wasCorrectNetwork) {
+          // Try to get current signer and address to reload data
+          try {
+            const signer = await currentProvider.getSigner();
+            const currentWalletAddress = await signer.getAddress();
+            setAddress(currentWalletAddress); // Ensure address state is up-to-date
+            fetchWalletData(currentWalletAddress);
+          } catch (e) {
+            console.error("Could not get signer after chain change, disconnecting.", e);
+            disconnectWallet();
           }
+        } else {
+          // checkNetwork already set an error and toasted. Clear local data.
+          setAstroBalance(0);
+          setNfts([]);
+          // If an address was set, keep it, but data will be empty/error shown
+        }
       }
     };
 
@@ -274,12 +257,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const checkAllowance = async (spenderAddress: string, amount: number): Promise<boolean> => {
     if (!address) {
-      // setError("Please connect your wallet first to check allowance.");
       return false;
     }
     const provider = getProvider();
     if (!provider) {
-      // setError("MetaMask not found.");
       return false;
     }
     if (!await checkNetwork(provider)) return false;
@@ -292,7 +273,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } catch (err: any) {
       console.error("Error checking allowance:", err);
       setError(err.message || "Failed to check token allowance.");
-      // toast({ title: "Allowance Check Failed", description: err.message || "Could not check token allowance.", variant: "destructive" });
       return false;
     }
   };
@@ -333,11 +313,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       await tx.wait();
       
       toast({ title: "Approval Successful", description: `${amount} ASTRO tokens approved for AstroNFT contract.` });
+      // Re-check allowance for UI update (or expect parent component to do it)
+      // await checkAllowance(ASTRO_NFT_ADDRESS, amount); // Optional: directly update state if needed
       setLoading(false);
       return true;
-    } catch (err: any) {
+    } catch (err: any)
+    {
       console.error("Error approving tokens:", err);
-      const displayError = err.reason || err.message || "Failed to approve tokens.";
+      const displayError = err.reason || err.code || err.message || "Failed to approve tokens.";
       setError(displayError);
       toast({ title: "Approval Failed", description: displayError, variant: "destructive" });
       setLoading(false);
@@ -379,12 +362,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const receipt = await tx.wait();
       
       toast({ title: "NFT Minted!", description: `Transaction successful: ${receipt.hash.substring(0,10)}...` });
-      await fetchWalletData(); // Refresh wallet data
+      await fetchWalletData(address); // Refresh wallet data for current address
       setLoading(false);
       return true;
     } catch (err: any) {
       console.error("Error minting NFT:", err);
-      const displayError = err.reason || err.message || "Failed to mint NFT.";
+      const displayError = err.reason || err.code || err.message || "Failed to mint NFT.";
       setError(displayError);
       toast({ title: "Minting Failed", description: displayError, variant: "destructive" });
       setLoading(false);
@@ -421,16 +404,11 @@ export const useWallet = () => {
   return context;
 };
 
-// Helper for IPFS URIs - TODO: Make configurable or more robust
-// const ipfsGatewayUrl = (ipfsUri: string) => {
-//   if (ipfsUri.startsWith('ipfs://')) {
-//     return `https://ipfs.io/ipfs/${ipfsUri.substring(7)}`;
-//   }
-//   return ipfsUri; 
-// };
-
 declare global {
   interface Window {
-    ethereum?: any; // Define more specific type if available (e.g., from MetaMask SDK)
+    ethereum?: any; 
   }
 }
+
+
+    
