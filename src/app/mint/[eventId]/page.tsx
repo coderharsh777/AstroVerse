@@ -20,18 +20,21 @@ const ASTRO_NFT_CONTRACT_ADDRESS = "0xNFTAddress"; // TODO: Replace with your De
 
 async function fetchEventById(id: string): Promise<AstrophysicalEvent | null> {
   try {
-    // Ensure the URL is absolute, especially for server-side fetching or consistent behavior.
-    // If running locally, process.env.NEXT_PUBLIC_APP_URL should be set in next.config.ts or .env.local
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const res = await fetch(`${baseUrl}/data/events.json`);
+    // For client-side fetching from the public directory, a root-relative path is robust.
+    const res = await fetch('/data/events.json');
     if (!res.ok) {
-        console.error("Failed to fetch events.json:", res.status, res.statusText);
+        console.error(`Failed to fetch '/data/events.json': ${res.status} ${res.statusText}`);
         return null;
     }
-    const events: AstrophysicalEvent[] = await res.json();
-    return events.find(event => event.id === id) || null;
-  } catch (error) {
-    console.error("Error fetching event:", error);
+    const eventsData: AstrophysicalEvent[] = await res.json();
+    const event = eventsData.find(e => e.id === id);
+    if (!event) {
+      // console.warn(`Event with id "${id}" not found in /data/events.json`); // Optional: for debugging missing event
+      return null;
+    }
+    return event;
+  } catch (error: any) {
+    console.error("Error fetching or parsing event data from /data/events.json:", error.message || error);
     return null;
   }
 }
@@ -49,8 +52,8 @@ export default function MintEventPage() {
     loading: walletLoading, 
     connectWallet, 
     fetchWalletData,
-    checkAllowance, // New function from context
-    error: walletError, // Wallet context error
+    checkAllowance,
+    error: walletError,
     targetNetworkName
   } = useWallet();
 
@@ -86,7 +89,7 @@ export default function MintEventPage() {
     } else {
       setIsApproved(false); // Not connected or no cost, so not "approved" in this context
     }
-  }, [address, checkAllowance, MINT_COST]);
+  }, [address, checkAllowance]); // MINT_COST is a constant, so not needed in deps
 
   useEffect(() => {
     updateAllowanceStatus();
@@ -97,19 +100,21 @@ export default function MintEventPage() {
     if (!event) return;
     const success = await approveAstroTokens(MINT_COST);
     if (success) {
-      setIsApproved(true); // Optimistically set, or re-verify with checkAllowance
+      setIsApproved(true); 
       toast({ title: "Approval Successful", description: `Ready to mint ${event.name} NFT.` });
-      await updateAllowanceStatus(); // Verify and update UI
+      await updateAllowanceStatus(); 
     }
   };
 
   const handleMint = async () => {
     if (!event) return;
-    const success = await mintAstroNft(event.metadataUri); // Ensure metadataUri is correct (e.g., ipfs://hash)
+    const success = await mintAstroNft(event.metadataUri); 
     if (success) {
       toast({ title: "Mint Successful!", description: `You've minted an NFT for ${event.name}!`, duration: 5000 });
       router.push('/wallet'); 
-      await fetchWalletData(); // Refresh wallet data after minting
+      if (address) { // Ensure address is still valid before fetching
+         await fetchWalletData(address); 
+      }
     }
   };
 
@@ -118,7 +123,7 @@ export default function MintEventPage() {
   }
 
   if (!event) {
-    return <div className="text-center py-12 text-xl text-destructive">Event not found.</div>;
+    return <div className="text-center py-12 text-xl text-destructive">Event not found or failed to load. Please check console for errors.</div>;
   }
 
   const canAfford = astroBalance >= MINT_COST;
@@ -144,7 +149,7 @@ export default function MintEventPage() {
       <Card className="overflow-hidden shadow-2xl bg-card border border-border rounded-xl">
         <div className="grid md:grid-cols-2">
           <div className="relative w-full h-64 md:h-auto min-h-[300px]">
-            <Image src={event.image} alt={event.name} layout="fill" objectFit="cover" data-ai-hint={event['data-ai-hint'] as string || "space event"} />
+            <Image src={event.image} alt={event.name} layout="fill" objectFit="cover" data-ai-hint={(event['data-ai-hint'] as string) || 'space event'} />
           </div>
           <div className="p-6 md:p-8 flex flex-col">
             <CardHeader className="p-0 mb-4">
@@ -208,7 +213,7 @@ export default function MintEventPage() {
                       Mint NFT
                     </Button>
                   )}
-                  <Button variant="outline" onClick={async () => { await fetchWalletData(); await updateAllowanceStatus(); }} disabled={walletLoading || checkingAllowance} className="w-full text-muted-foreground">
+                  <Button variant="outline" onClick={async () => { if(address) { await fetchWalletData(address); } await updateAllowanceStatus(); }} disabled={walletLoading || checkingAllowance} className="w-full text-muted-foreground">
                     {(walletLoading || checkingAllowance) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Refresh Data & Allowance
                   </Button>
@@ -222,13 +227,3 @@ export default function MintEventPage() {
   );
 }
 
-// This component was missing, adding it here. Could be in components/ui/badge.tsx if preferred
-// const Badge: React.FC<{variant?: string; className?: string; children: React.ReactNode}> = ({className, children}) => {
-//  return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${className}`}>{children}</span>
-//}
-// Note: After checking project files, Badge component IS available in ui/badge.tsx so the above is not needed.
-// The mint page was trying to use it without importing, so I'll add the import from '@/components/ui/badge'.
-// It's already imported now, so no change needed for Badge import itself.
-// The issue with `Badge` was that it was used with `variant="secondary"` which is valid, but the example
-// `bg-orange-500/20 text-orange-400 border-orange-500/50` are custom styles overriding the theme.
-// This is fine as per PRD for specific highlights.
