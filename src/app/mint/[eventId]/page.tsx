@@ -1,11 +1,12 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import type { AstrophysicalEvent } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWallet } from '@/context/WalletContext';
 import { useToast } from '@/hooks/use-toast';
@@ -14,11 +15,19 @@ import { format, parseISO } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const MINT_COST = 100; // ASTRO tokens
+const ASTRO_NFT_CONTRACT_ADDRESS = "0xNFTAddress"; // TODO: Replace with your Deployed Astro NFT Contract Address (must match WalletContext)
+
 
 async function fetchEventById(id: string): Promise<AstrophysicalEvent | null> {
   try {
-    const res = await fetch(`/data/events.json`);
-    if (!res.ok) return null;
+    // Ensure the URL is absolute, especially for server-side fetching or consistent behavior.
+    // If running locally, process.env.NEXT_PUBLIC_APP_URL should be set in next.config.ts or .env.local
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const res = await fetch(`${baseUrl}/data/events.json`);
+    if (!res.ok) {
+        console.error("Failed to fetch events.json:", res.status, res.statusText);
+        return null;
+    }
     const events: AstrophysicalEvent[] = await res.json();
     return events.find(event => event.id === id) || null;
   } catch (error) {
@@ -32,58 +41,79 @@ export default function MintEventPage() {
   const eventId = params.eventId as string;
   const router = useRouter();
   const { toast } = useToast();
-  const { address, astroBalance, approveAstroTokens, mintAstroNft, loading: walletLoading, connectWallet, fetchWalletData } = useWallet();
+  const { 
+    address, 
+    astroBalance, 
+    approveAstroTokens, 
+    mintAstroNft, 
+    loading: walletLoading, 
+    connectWallet, 
+    fetchWalletData,
+    checkAllowance, // New function from context
+    error: walletError, // Wallet context error
+    targetNetworkName
+  } = useWallet();
 
   const [event, setEvent] = useState<AstrophysicalEvent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isApproved, setIsApproved] = useState(false); // Placeholder for actual allowance check
+  const [loadingEvent, setLoadingEvent] = useState(true);
+  const [isApproved, setIsApproved] = useState(false);
+  const [checkingAllowance, setCheckingAllowance] = useState(false);
 
   useEffect(() => {
     if (eventId) {
       const loadEvent = async () => {
-        setLoading(true);
+        setLoadingEvent(true);
         const eventData = await fetchEventById(eventId);
         setEvent(eventData);
-        setLoading(false);
+        setLoadingEvent(false);
       };
       loadEvent();
     }
   }, [eventId]);
 
-  // Placeholder: Check allowance when wallet/balance changes
-  useEffect(() => {
-    if (address && astroBalance >= MINT_COST) {
-      // In a real app, you'd check token allowance here.
-      // For this example, we'll assume not approved initially.
-      // setIsApproved(false); // Or check actual allowance:
-      // const checkAllowance = async () => {
-      //    const allowance = await tokenContract.allowance(address, ASTRO_NFT_ADDRESS);
-      //    setIsApproved(ethers.formatEther(allowance) >= MINT_COST);
-      // }
-      // checkAllowance();
+  const updateAllowanceStatus = useCallback(async () => {
+    if (address && ASTRO_NFT_CONTRACT_ADDRESS && MINT_COST > 0) {
+      setCheckingAllowance(true);
+      try {
+        const approved = await checkAllowance(ASTRO_NFT_CONTRACT_ADDRESS, MINT_COST);
+        setIsApproved(approved);
+      } catch (e) {
+        console.error("Failed to check allowance:", e);
+        setIsApproved(false); // Assume not approved on error
+      } finally {
+        setCheckingAllowance(false);
+      }
+    } else {
+      setIsApproved(false); // Not connected or no cost, so not "approved" in this context
     }
-  }, [address, astroBalance]);
+  }, [address, checkAllowance, MINT_COST]);
+
+  useEffect(() => {
+    updateAllowanceStatus();
+  }, [address, astroBalance, updateAllowanceStatus]); // Re-check if user, balance, or cost changes
 
 
   const handleApprove = async () => {
     if (!event) return;
     const success = await approveAstroTokens(MINT_COST);
     if (success) {
-      setIsApproved(true);
+      setIsApproved(true); // Optimistically set, or re-verify with checkAllowance
       toast({ title: "Approval Successful", description: `Ready to mint ${event.name} NFT.` });
+      await updateAllowanceStatus(); // Verify and update UI
     }
   };
 
   const handleMint = async () => {
     if (!event) return;
-    const success = await mintAstroNft(event.metadataUri);
+    const success = await mintAstroNft(event.metadataUri); // Ensure metadataUri is correct (e.g., ipfs://hash)
     if (success) {
       toast({ title: "Mint Successful!", description: `You've minted an NFT for ${event.name}!`, duration: 5000 });
-      router.push('/wallet'); // Navigate to wallet page after successful mint
+      router.push('/wallet'); 
+      await fetchWalletData(); // Refresh wallet data after minting
     }
   };
 
-  if (loading) {
+  if (loadingEvent) {
     return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-16 w-16 animate-spin text-accent" /><p className="ml-3 text-lg">Loading Event Details...</p></div>;
   }
 
@@ -98,6 +128,18 @@ export default function MintEventPage() {
       <Button variant="outline" onClick={() => router.back()} className="mb-6 text-accent border-accent hover:bg-accent hover:text-accent-foreground">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Events
       </Button>
+
+      {walletError && (
+         <Alert variant="destructive" className="my-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Wallet Error</AlertTitle>
+            <AlertDescription>
+                {walletError}
+                {walletError.toLowerCase().includes("network") && 
+                    ` Please ensure you are connected to the ${targetNetworkName}.`}
+            </AlertDescription>
+         </Alert>
+      )}
 
       <Card className="overflow-hidden shadow-2xl bg-card border border-border rounded-xl">
         <div className="grid md:grid-cols-2">
@@ -154,8 +196,8 @@ export default function MintEventPage() {
                   )}
 
                   {canAfford && !isApproved && (
-                    <Button onClick={handleApprove} disabled={walletLoading} className="w-full text-lg py-6 bg-secondary hover:bg-secondary/90">
-                      {walletLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle className="mr-2 h-5 w-5" />}
+                    <Button onClick={handleApprove} disabled={walletLoading || checkingAllowance} className="w-full text-lg py-6 bg-secondary hover:bg-secondary/90">
+                      {(walletLoading || checkingAllowance) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle className="mr-2 h-5 w-5" />}
                       Approve {MINT_COST} ASTRO
                     </Button>
                   )}
@@ -166,9 +208,9 @@ export default function MintEventPage() {
                       Mint NFT
                     </Button>
                   )}
-                  <Button variant="outline" onClick={fetchWalletData} disabled={walletLoading} className="w-full text-muted-foreground">
-                    {walletLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Refresh Balance
+                  <Button variant="outline" onClick={async () => { await fetchWalletData(); await updateAllowanceStatus(); }} disabled={walletLoading || checkingAllowance} className="w-full text-muted-foreground">
+                    {(walletLoading || checkingAllowance) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Refresh Data & Allowance
                   </Button>
                 </div>
               )}
@@ -179,3 +221,14 @@ export default function MintEventPage() {
     </div>
   );
 }
+
+// This component was missing, adding it here. Could be in components/ui/badge.tsx if preferred
+// const Badge: React.FC<{variant?: string; className?: string; children: React.ReactNode}> = ({className, children}) => {
+//  return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${className}`}>{children}</span>
+//}
+// Note: After checking project files, Badge component IS available in ui/badge.tsx so the above is not needed.
+// The mint page was trying to use it without importing, so I'll add the import from '@/components/ui/badge'.
+// It's already imported now, so no change needed for Badge import itself.
+// The issue with `Badge` was that it was used with `variant="secondary"` which is valid, but the example
+// `bg-orange-500/20 text-orange-400 border-orange-500/50` are custom styles overriding the theme.
+// This is fine as per PRD for specific highlights.
