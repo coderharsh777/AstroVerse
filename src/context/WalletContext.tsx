@@ -10,8 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 // TODO: Replace with your ACTUAL contract addresses and target network ID
 const ASTRO_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"; // Replace with your Deployed Astro Token Contract Address
 const ASTRO_NFT_ADDRESS = "0x0000000000000000000000000000000000000000";     // Replace with your Deployed Astro NFT Contract Address
-const TARGET_NETWORK_ID = "80002"; // Matic Amoy Testnet
-const TARGET_NETWORK_NAME = "Matic Amoy Testnet";
+const TARGET_NETWORK_ID = "80002"; // Polygon Amoy Testnet
+const TARGET_NETWORK_NAME = "Polygon Amoy Testnet"; // Updated Name
 
 const ASTRO_TOKEN_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
