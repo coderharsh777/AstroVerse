@@ -14,8 +14,8 @@ import { AlertCircle, ArrowLeft, CalendarDays, CheckCircle, Coins, Loader2, Spar
 import { format, parseISO } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const MINT_COST = 100; // ASTRO tokens
-const ASTRO_NFT_CONTRACT_ADDRESS = "0xNFTAddress"; // TODO: Replace with your Deployed Astro NFT Contract Address (must match WalletContext)
+const MINT_COST = 0; // ASTRO tokens - Changed from 100 to 0 for testing
+const ASTRO_NFT_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // TODO: Replace with your Deployed Astro NFT Contract Address (must match WalletContext)
 
 
 async function fetchEventById(id: string): Promise<AstrophysicalEvent | null> {
@@ -87,17 +87,20 @@ export default function MintEventPage() {
         setCheckingAllowance(false);
       }
     } else {
-      setIsApproved(false); // Not connected or no cost, so not "approved" in this context
+      // If mint cost is 0, or no address, or no NFT contract, approval is not needed/relevant.
+      // For MINT_COST = 0, we can consider it "approved" as no tokens need to be spent.
+      setIsApproved(MINT_COST === 0); 
+      setCheckingAllowance(false);
     }
-  }, [address, checkAllowance]); // MINT_COST is a constant, so not needed in deps
+  }, [address, checkAllowance]);
 
   useEffect(() => {
     updateAllowanceStatus();
-  }, [address, astroBalance, updateAllowanceStatus]); // Re-check if user, balance, or cost changes
+  }, [address, astroBalance, updateAllowanceStatus]);
 
 
   const handleApprove = async () => {
-    if (!event) return;
+    if (!event || MINT_COST === 0) return; // No approval needed if cost is 0
     const success = await approveAstroTokens(MINT_COST);
     if (success) {
       setIsApproved(true); 
@@ -112,7 +115,7 @@ export default function MintEventPage() {
     if (success) {
       toast({ title: "Mint Successful!", description: `You've minted an NFT for ${event.name}!`, duration: 5000 });
       router.push('/wallet'); 
-      if (address) { // Ensure address is still valid before fetching
+      if (address) { 
          await fetchWalletData(address); 
       }
     }
@@ -126,7 +129,7 @@ export default function MintEventPage() {
     return <div className="text-center py-12 text-xl text-destructive">Event not found or failed to load. Please check console for errors.</div>;
   }
 
-  const canAfford = astroBalance >= MINT_COST;
+  const canAfford = MINT_COST === 0 || astroBalance >= MINT_COST;
 
   return (
     <div className="space-y-8">
@@ -190,7 +193,7 @@ export default function MintEventPage() {
                     <span className="text-sm font-semibold text-foreground/90">{astroBalance.toFixed(2)} ASTRO</span>
                   </div>
 
-                  {!canAfford && (
+                  {!canAfford && MINT_COST > 0 && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Insufficient ASTRO Balance</AlertTitle>
@@ -200,14 +203,16 @@ export default function MintEventPage() {
                     </Alert>
                   )}
 
-                  {canAfford && !isApproved && (
+                  {/* Approval button only shows if cost > 0 and not approved */}
+                  {canAfford && MINT_COST > 0 && !isApproved && (
                     <Button onClick={handleApprove} disabled={walletLoading || checkingAllowance} className="w-full text-lg py-6 bg-secondary hover:bg-secondary/90">
                       {(walletLoading || checkingAllowance) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle className="mr-2 h-5 w-5" />}
                       Approve {MINT_COST} ASTRO
                     </Button>
                   )}
                   
-                  {canAfford && isApproved && (
+                  {/* Mint button shows if affordable AND (cost is 0 OR isApproved is true) */}
+                  {canAfford && (MINT_COST === 0 || isApproved) && (
                     <Button onClick={handleMint} disabled={walletLoading} className="w-full text-lg py-6 bg-accent hover:bg-accent/90">
                       {walletLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
                       Mint NFT
