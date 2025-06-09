@@ -10,8 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 // TODO: Replace with your ACTUAL contract addresses and target network ID
 const ASTRO_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"; // Replace with your Deployed Astro Token Contract Address
 const ASTRO_NFT_ADDRESS = "0x0000000000000000000000000000000000000000";     // Replace with your Deployed Astro NFT Contract Address
-const TARGET_NETWORK_ID = "11155111"; // Example: Sepolia Testnet. Replace with your target network (e.g., "1" for Ethereum Mainnet)
-const TARGET_NETWORK_NAME = "Sepolia Testnet"; // Example: "Ethereum Mainnet"
+const TARGET_NETWORK_ID = "80002"; // Matic Amoy Testnet
+const TARGET_NETWORK_NAME = "Matic Amoy Testnet";
 
 const ASTRO_TOKEN_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -294,7 +294,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     try {
       const tokenContract = getAstroTokenContract(provider);
-      const amountNeeded = ethers.parseEther(amount.toString());
+      const amountNeeded = ethers.parseUnits(amount.toString(), 18); // Assuming 18 decimals for ASTRO token
       const currentAllowance = await tokenContract.allowance(address, spenderAddress);
       return currentAllowance >= amountNeeded;
     } catch (err: any) {
@@ -339,7 +339,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       
       const tokenContract = getAstroTokenContract(signer);
-      const amountToApprove = ethers.parseEther(amount.toString());
+      const amountToApprove = ethers.parseUnits(amount.toString(), 18); // Assuming 18 decimals
       
       toast({ title: "Approval Pending", description: "Please approve the token spending in MetaMask." });
       const tx = await tokenContract.approve(ASTRO_NFT_ADDRESS, amountToApprove);
