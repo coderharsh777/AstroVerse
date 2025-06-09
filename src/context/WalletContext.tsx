@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 const ASTRO_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"; // Replace with your Deployed Astro Token Contract Address
 const ASTRO_NFT_ADDRESS = "0x0000000000000000000000000000000000000000";     // Replace with your Deployed Astro NFT Contract Address
 const TARGET_NETWORK_ID = "80002"; // Polygon Amoy Testnet
-const TARGET_NETWORK_NAME = "Polygon Amoy Testnet"; // Updated Name
+const TARGET_NETWORK_NAME = "Polygon Amoy Testnet";
 
 const ASTRO_TOKEN_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -30,7 +30,7 @@ interface WalletContextType extends WalletState {
   disconnectWallet: () => void;
   approveAstroTokens: (amount: number) => Promise<boolean>;
   mintAstroNft: (metadataUri: string) => Promise<boolean>;
-  fetchWalletData: (addressToFetchFor: string) => Promise<void>; // Parameter added
+  fetchWalletData: (addressToFetchFor: string) => Promise<void>;
   checkAllowance: (spenderAddress: string, amount: number) => Promise<boolean>;
   targetNetworkName: string;
 }
@@ -41,7 +41,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [address, setAddress] = useState<string | null>(null);
   const [astroBalance, setAstroBalance] = useState<number>(0);
   const [nfts, setNfts] = useState<Nft[]>([]);
-  const [loading, setLoading] = useState<boolean>(false); // Combined loading state
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -68,14 +68,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const getAstroTokenContract = useCallback((providerOrSigner: ethers.Provider | ethers.Signer) => {
     if (ASTRO_TOKEN_ADDRESS === "0x0000000000000000000000000000000000000000") {
-        console.warn("ASTRO_TOKEN_ADDRESS is a placeholder (zero address). Real contract interactions will fail.");
+        console.warn("ASTRO_TOKEN_ADDRESS is a placeholder (zero address). Real contract interactions for token operations will fail or return zero balances.");
     }
     return new Contract(ASTRO_TOKEN_ADDRESS, ASTRO_TOKEN_ABI, providerOrSigner);
   }, []);
 
   const getAstroNftContract = useCallback((providerOrSigner: ethers.Provider | ethers.Signer) => {
      if (ASTRO_NFT_ADDRESS === "0x0000000000000000000000000000000000000000") {
-        console.warn("ASTRO_NFT_ADDRESS is a placeholder (zero address). Real contract interactions will fail.");
+        console.warn("ASTRO_NFT_ADDRESS is a placeholder (zero address). Real contract interactions for NFT operations will fail.");
     }
     return new Contract(ASTRO_NFT_ADDRESS, ASTRO_NFT_ABI, providerOrSigner);
   }, []);
@@ -88,18 +88,16 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       toast({ title: "Wrong Network", description: errMsg, variant: "destructive", duration: 7000 });
       return false;
     }
-    setError(null); // Clear network error if correct
+    setError(null);
     return true;
   };
 
   const fetchWalletData = useCallback(async (addressToFetchFor: string) => {
     if (!addressToFetchFor) {
-      // console.warn("fetchWalletData called without an address.");
       return;
     }
 
     setLoading(true);
-    // setError(null); // Error is reset by checkNetwork or at start of connectWallet etc.
 
     const provider = getProvider();
     if (!provider) {
@@ -110,50 +108,48 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (!await checkNetwork(provider)) {
       setLoading(false);
-      // Clear data if network is wrong to avoid showing stale data from another network
       setAstroBalance(0);
       setNfts([]);
       return;
     }
 
     try {
-      // Only attempt to fetch balance if the address is not the placeholder
+      let currentAstroBalance = 0;
       if (ASTRO_TOKEN_ADDRESS !== "0x0000000000000000000000000000000000000000") {
         const tokenContract = getAstroTokenContract(provider);
         const balanceBigInt = await tokenContract.balanceOf(addressToFetchFor);
-        const formattedBalance = parseFloat(ethers.formatEther(balanceBigInt));
-        setAstroBalance(formattedBalance);
-         toast({ title: "Wallet Data Updated", description: `Balance for ${addressToFetchFor.substring(0,6)}...: ${formattedBalance.toFixed(4)} ASTRO` });
+        const formattedBalance = parseFloat(ethers.formatEther(balanceBigInt)); // Assumes 18 decimals
+        currentAstroBalance = formattedBalance;
+
+        console.log('Debugging ASTRO Balance:');
+        console.log(' - Connected Wallet Address:', addressToFetchFor);
+        console.log(' - Raw ASTRO Balance (BigInt):', balanceBigInt.toString());
+        console.log(' - Formatted ASTRO Balance (ether units, 18 decimals assumed):', ethers.formatEther(balanceBigInt));
+
       } else {
-        setAstroBalance(0); // Keep balance at 0 for placeholder
-        console.warn("Skipping ASTRO token balance fetch: ASTRO_TOKEN_ADDRESS is a placeholder.");
+        console.warn("ASTRO_TOKEN_ADDRESS is a placeholder. ASTRO balance will be 0. Update with your deployed token contract address.");
+        currentAstroBalance = 0; // Ensure balance is 0 if using placeholder
       }
+      setAstroBalance(currentAstroBalance); // Set state after calculations
 
-
-      // --- MOCK NFT DATA (Remove/replace with actual fetching) ---
       const mockNfts: Nft[] = [
         { id: "1", name: "Supernova Spectacle", description: "Witness the birth of new elements.", image: "https://placehold.co/300x300/242959/FFFFFF.png?text=NFT+1", event: {id: "sn1987a", name: "Supernova 1987A", date: "1987-02-23T07:35:00Z"}, metadataUri: "ipfs://QmExampleHash1"},
         { id: "2", name: "Eclipse Elegance", description: "A dance of celestial bodies.", image: "https://placehold.co/300x300/7B62FF/FFFFFF.png?text=NFT+2", event: {id: "eclipse2024", name: "Total Solar Eclipse 2024", date: "2024-04-08T18:17:00Z"}, metadataUri: "ipfs://QmExampleHash2"},
       ];
-      // TODO: Implement actual NFT fetching logic here using addressToFetchFor
-      // Only fetch NFTs if the NFT contract address is not the placeholder
+      
       if (ASTRO_NFT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
-         // Actual NFT fetching logic would go here, e.g.:
-         // const nftContract = getAstroNftContract(provider);
-         // const tokenIds = await nftContract.walletOfOwner(addressToFetchFor);
-         // const fetchedNfts = await Promise.all(tokenIds.map(async (id: BigInt) => { ... }));
-         // setNfts(fetchedNfts);
-         console.warn("Actual NFT fetching logic is commented out; using mock data. ASTRO_NFT_ADDRESS is not a placeholder.")
-         setNfts(mockNfts); // Using mock data for now
+         console.warn("Actual NFT fetching logic is commented out; using mock data. Update with your deployed NFT contract for real NFT data.")
+         setNfts(mockNfts);
       } else {
-        setNfts(mockNfts); // Still show mock data if placeholder for NFT contract, or clear if preferred: setNfts([]);
+        setNfts(mockNfts);
         console.warn("Using mock NFT data: ASTRO_NFT_ADDRESS is a placeholder.");
       }
       
-      if (ASTRO_TOKEN_ADDRESS !== "0x0000000000000000000000000000000000000000") {
-        // This toast was here, moved it to be conditional on actually fetching balance
-        // toast({ title: "Wallet Data Updated", description: `Balance for ${addressToFetchFor.substring(0,6)}...: ${astroBalance.toFixed(4)} ASTRO` });
-      }
+      toast({ 
+        title: "Wallet Data Updated", 
+        description: `Balance for ${addressToFetchFor.substring(0,6)}...: ${currentAstroBalance.toFixed(4)} ASTRO`,
+        duration: 5000 
+      });
 
     } catch (err: any) {
       console.error("Error fetching wallet data:", err);
@@ -163,9 +159,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } finally {
       setLoading(false);
     }
-  }, [getProvider, toast, getAstroTokenContract, getAstroNftContract]); // Removed `address` from dependencies
+  }, [getProvider, toast, getAstroTokenContract, getAstroNftContract]);
 
-  // Effect for initializing address from localStorage or using a default for development
   useEffect(() => {
     const DEV_DEFAULT_ADDRESS = "0x0fE810267f02D7AbA8Ac7dD763ff534d8d6a8CF8";
     let initialAddressToUse: string | null = localStorage.getItem('walletAddress');
@@ -181,7 +176,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       fetchWalletData(initialAddressToUse);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchWalletData]); // fetchWalletData is now stable
+  }, [fetchWalletData]);
 
   const connectWallet = async () => {
     setLoading(true);
@@ -249,12 +244,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       toast({ title: "Network Changed", description: "Verifying network and reloading data..." });
       const currentProvider = getProvider();
       if (currentProvider) {
-        const wasCorrectNetwork = await checkNetwork(currentProvider); // This will set error if wrong
+        const wasCorrectNetwork = await checkNetwork(currentProvider);
         if (wasCorrectNetwork) {
           try {
             const signer = await currentProvider.getSigner();
             const currentWalletAddress = await signer.getAddress();
-            setAddress(currentWalletAddress); // Ensure address state is up-to-date
+            setAddress(currentWalletAddress);
             fetchWalletData(currentWalletAddress);
           } catch (e) {
             console.error("Could not get signer after chain change, disconnecting.", e);
@@ -294,7 +289,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     try {
       const tokenContract = getAstroTokenContract(provider);
-      const amountNeeded = ethers.parseUnits(amount.toString(), 18); // Assuming 18 decimals for ASTRO token
+      const amountNeeded = ethers.parseUnits(amount.toString(), 18);
       const currentAllowance = await tokenContract.allowance(address, spenderAddress);
       return currentAllowance >= amountNeeded;
     } catch (err: any) {
@@ -339,7 +334,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       
       const tokenContract = getAstroTokenContract(signer);
-      const amountToApprove = ethers.parseUnits(amount.toString(), 18); // Assuming 18 decimals
+      const amountToApprove = ethers.parseUnits(amount.toString(), 18);
       
       toast({ title: "Approval Pending", description: "Please approve the token spending in MetaMask." });
       const tx = await tokenContract.approve(ASTRO_NFT_ADDRESS, amountToApprove);
@@ -398,7 +393,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const receipt = await tx.wait();
       
       toast({ title: "NFT Minted!", description: `Transaction successful: ${receipt.hash.substring(0,10)}...` });
-      await fetchWalletData(address); // Refresh wallet data for current address
+      await fetchWalletData(address);
       setLoading(false);
       return true;
     } catch (err: any) {
